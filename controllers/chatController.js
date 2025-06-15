@@ -16,24 +16,22 @@ exports.createChat = async (req, res, next) => {
     const type = req.body.type
 
     if (type == "chat") {
-      let chat = await Chat.findOne({
-        include: [{
-          model: User,
-          as: "users", // Must match the alias used in Chat.belongsToMany
-          where: {
-            id: [userId, scUserId]
-          },
-          through: {
-            attributes: []
-          },
-          required: true,
-        }],
-        group: ['chat.id'],
-        // having: sequelize.literal('COUNT(DISTINCT `users`.`id`) = 2'), // ensure both users are in that chat
-      });
-
+      const [chat] = await sequelize.query(
+        `
+      SELECT chat_id
+      FROM user_chats
+      WHERE user_id IN (:userId1, :userId2)
+      GROUP BY chat_id
+      HAVING COUNT(DISTINCT user_id) = 2
+      LIMIT 1
+      `,
+        {
+          replacements: { userId1: userId, userId2: scUserId },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
       if (chat) {
-        return res.status(400).json({ message: "the chat already found" })
+        return res.status(400).json({ message: "the chat already found", data: chat })
       }
       chat = await Chat.create({ admin_id: userId })
       await UserChat.create({ chat_id: chat.id, user_id: userId })
@@ -156,7 +154,7 @@ exports.markMessageAsdeliverd = async (req, res, next) => {
     if (!message) {
       res.status(404).json({ message: "cant find message" });
     }
-    if (message.status == 'deliverd'){
+    if (message.status == 'deliverd') {
       res.status(200).json("message allready deliverd")
     }
     message.status = 'deliverd'
