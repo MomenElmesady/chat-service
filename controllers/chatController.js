@@ -14,9 +14,11 @@ exports.createChat = async (req, res, next) => {
     const userId = req.userId
     const scUserId = req.body.userId
     const type = req.body.type
-
+    if (userId == scUserId){
+      return res.status(400).json({ message: "repeated user id" })
+    }
     if (type == "chat") {
-      const [chat] = await sequelize.query(
+      let [chat] = await sequelize.query(
         `
       SELECT chat_id
       FROM user_chats
