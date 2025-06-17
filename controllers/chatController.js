@@ -62,7 +62,6 @@ exports.getUserChats = async (req, res, next) => {
           required: true,
           through: {
             model: UserChat,
-            // where: { user_id: { [Op.ne]: userId } },
             attributes: ['is_pinned', 'is_favorite', 'pinned_at']
           },
           attributes: ['id', 'name', 'profile_image']
@@ -87,7 +86,7 @@ exports.getUserChats = async (req, res, next) => {
     });
 
     // Add the `isFromMe` flag based on message.user.id
-    const chatsWithFlags = chats.map(chat => {
+    const chatsWithFlags = chats.filter(chat => chat.users.some(user => user.id === userId)).map(chat => {
       const lastMessage = chat.messages?.[0] || null;
       if (lastMessage) {
         lastMessage.setDataValue('isFromMe', lastMessage.user?.id === userId);
@@ -95,16 +94,14 @@ exports.getUserChats = async (req, res, next) => {
 
       // Extract pinned/favorite info from the pivot
       const currentUserData = chat.users.find(u => u.id === userId);
-      // console.log(currentUserData,"][")
-      const pinned = currentUserData.chat.dataValues.is_pinned || false;
-      const pinnedAt = currentUserData.chat.dataValues.pinned_at || null;
+      const pinned = currentUserData?.chat.dataValues.is_pinned || false;
+      const pinnedAt = currentUserData?.chat.dataValues.pinned_at || null;
 
       chat.setDataValue('is_pinned', pinned);
       chat.setDataValue('pinned_at', pinnedAt);
       chat.setDataValue('lastMessageCreatedAt', lastMessage?.createdAt || null);
 
       return chat;
-      const redis = require('../config/redis');
     });
 
     // Sort chats: pinned first by pinned_at DESC, then by lastMessageCreatedAt DESC

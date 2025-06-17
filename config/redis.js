@@ -7,8 +7,8 @@
 // import { Redis } from '@upstash/redis'
 const {Redis} = require("@upstash/redis")
 const redis = new Redis({
-  url: 'https://great-minnow-12205.upstash.io',
-  token: 'AS-tAAIjcDFhNDk3ZDAwZGM5NzY0ODAzOGQ4YWExMjEyMjFmZDA1M3AxMA',
+  url: 'https://causal-poodle-44170.upstash.io',
+  token: 'AayKAAIjcDEzY2I5MmVjNzZkNjc0MzI5YTc1MTAwNDQxOGM4YTUxNnAxMA',
 })
 
 module.exports = redis;
