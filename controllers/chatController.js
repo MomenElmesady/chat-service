@@ -53,77 +53,102 @@ exports.getUserChats = async (req, res, next) => {
   try {
     const userId = req.userId;
 
-    const chats = await Chat.findAll({
-      attributes: ['id', 'type'],
-      include: [
-        {
-          model: User,
-          as: 'users',
-          required: true,
-          through: {
-            model: UserChat,
-            attributes: ['is_pinned', 'is_favorite', 'pinned_at']
-          },
-          attributes: ['id', 'name', 'profile_image']
-        },
-        {
-          model: Message,
-          as: "messages",
-          attributes: ['id', 'content', 'createdAt', 'status', 'type', 'user_id'],
-          separate: true,
-          limit: 1,
-          order: [['createdAt', 'DESC']],
-          include: [
-            {
-              model: User,
-              as: "user",
-              attributes: ['id']
-            }
-          ]
-        }
-      ],
-      logging: console.log,
+    const results = await sequelize.query(
+      `
+      SELECT 
+        c.id AS chat_id,
+        u.id AS user_id,
+        u.name AS user_name,
+        u.profile_image,
+        m.content,
+        m.status,
+        m.createdAt,
+        m.type,
+        m.user_id AS sender,
+        uc.user_id AS current_user_id,
+        uc.is_pinned,
+        uc.is_favorite,
+        uc.pinned_at,
+        (
+          SELECT COUNT(*)
+          FROM messages m2
+          WHERE m2.chat_id = c.id
+            AND m2.status != 'read'
+            AND m2.user_id != :userId
+        ) AS unread_count
+      FROM chats c
+      JOIN user_chats uc ON c.id = uc.chat_id AND uc.user_id = :userId
+      LEFT JOIN user_chats uc2 ON uc2.chat_id = c.id AND uc2.user_id != :userId
+      LEFT JOIN users u ON u.id = uc2.user_id 
+      LEFT JOIN messages m ON m.id = (
+        SELECT id
+        FROM messages
+        WHERE chat_id = c.id
+        ORDER BY createdAt DESC
+        LIMIT 1
+      )
+      ORDER BY m.createdAt DESC;
+      `,
+      {
+        replacements: { userId },
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    // Sort pinned chats first
+    results.sort((a, b) => {
+      if (b.is_pinned !== a.is_pinned) {
+        return b.is_pinned - a.is_pinned;
+      }
+      // fallback to message createdAt desc if both have same pinned state
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     });
 
-    // Add the `isFromMe` flag based on message.user.id
-    const chatsWithFlags = chats.filter(chat => chat.users.some(user => user.id === userId)).map(chat => {
-      const lastMessage = chat.messages?.[0] || null;
-      if (lastMessage) {
-        lastMessage.setDataValue('isFromMe', lastMessage.user?.id === userId);
+    // Group chats
+    const chatsMap = {};
+
+    for (const row of results) {
+      const chatId = row.chat_id;
+
+      if (!chatsMap[chatId]) {
+        chatsMap[chatId] = {
+          chatId: row.chat_id,
+          lastMessage: row.content
+            ? {
+                content: row.content,
+                status: row.status,
+                createdAt: row.createdAt,
+                type: row.type,
+                senderId: row.sender,
+                isMine: row.sender === userId,
+              }
+            : null,
+          unreadCount: row.unread_count,
+          isPinned: !!row.is_pinned,
+          isFavorite: !!row.is_favorite,
+          pinnedAt: row.pinned_at,
+          participants: [],
+        };
       }
 
-      // Extract pinned/favorite info from the pivot
-      const currentUserData = chat.users.find(u => u.id === userId);
-      const pinned = currentUserData?.chat.dataValues.is_pinned || false;
-      const pinnedAt = currentUserData?.chat.dataValues.pinned_at || null;
-
-      chat.setDataValue('is_pinned', pinned);
-      chat.setDataValue('pinned_at', pinnedAt);
-      chat.setDataValue('lastMessageCreatedAt', lastMessage?.createdAt || null);
-
-      return chat;
-    });
-
-    // Sort chats: pinned first by pinned_at DESC, then by lastMessageCreatedAt DESC
-    chatsWithFlags.sort((a, b) => {
-      if (a.getDataValue('is_pinned') && b.getDataValue('is_pinned')) {
-        return new Date(b.getDataValue('pinned_at')) - new Date(a.getDataValue('pinned_at'));
+      if (row.user_id) {
+        chatsMap[chatId].participants.push({
+          userId: row.user_id,
+          name: row.user_name,
+          profile_image: row.profile_image
+        });
       }
+    }
 
-      if (a.getDataValue('is_pinned')) return -1;
-      if (b.getDataValue('is_pinned')) return 1;
-
-      // If neither are pinned, sort by latest message createdAt
-      return new Date(b.getDataValue('lastMessageCreatedAt')) - new Date(a.getDataValue('lastMessageCreatedAt'));
-    });
-
-    res.status(200).json(chatsWithFlags);
+    const chats = Object.values(chatsMap);
+    res.status(200).json(chats);
 
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ message: "Something went wrong!" });
   }
 };
+
 exports.pinChat = async (req, res, next) => {
   try {
     const userId = req.userId;
