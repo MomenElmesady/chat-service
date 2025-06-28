@@ -26,7 +26,7 @@ module.exports = (io) => {
     // Mark user as online in Redis
     await redis.set(`user:${userId}`, socket.id);
     console.log(`User ${userId} is online`);
-    await markUserMessagesAsDelivered(userId, io) 
+    await markUserMessagesAsDelivered(userId, io)
 
 
     socket.on('send_message', async ({ receiverId, message }) => {
@@ -35,14 +35,17 @@ module.exports = (io) => {
         const senderSocketId = await redis.get(`user:${userId}`);
         const messageObj = await saveMessage(userId, receiverId, message, receiverSocketId);
 
+        console.log("message id: " + message.id);
+        console.log("message obj: " + messageObj['id']);
         // Notify recipient's device
-        io.to(receiverSocketId).emit('status_update', { messageId: message.id, status: 'sent' });
+        io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'sent' });
 
+        console.log("reciever socket : " + receiverSocketId);
         if (receiverSocketId) {
-          // send message to the reciver
+          // send message to the receiver
           io.to(receiverSocketId).emit('receive_message', messageObj);
           // Update sender's status to "Delivered"
-          io.to(senderSocketId).emit('status_update', { messageId: message.id, status: 'delivered' });
+          io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'delivered' });
         } else {
           await publishNotification({
             receiverId,
@@ -77,10 +80,16 @@ module.exports = (io) => {
       }
     });
 
-    // TODO -> do service, handle sender socketId
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
-      // Update the message in DB
-      await updateMessageToRead(messageId)
+      try {
+        await updateMessageToRead(messageId, senderId, io);
+      } catch (err) {
+        console.error('message_read error:', err);
+        socket.emit('error_occurred', {
+          type: 'MESSAGE_READ_ERROR',
+          message: 'Failed to mark message as read.',
+        });
+      }
     });
 
     socket.on("typing", async ({ userId, chatId }) => {
