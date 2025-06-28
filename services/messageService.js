@@ -153,7 +153,7 @@ const editMessage = async (messageId, content, userId, io) => {
         messageId,
         content,
         userId,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
     }
   } catch (error) {
@@ -225,7 +225,7 @@ const markUserMessagesAsDelivered = async (userId, io) => {
         if (senderSocketId) {
           io.to(senderSocketId).emit('messageDelivered', {
             messageId: msg.id,
-            receiverId: msg.reciever_id, 
+            receiverId: msg.reciever_id,
           });
         }
       })
@@ -235,7 +235,7 @@ const markUserMessagesAsDelivered = async (userId, io) => {
   }
 };
 
-const markChatAsRead = async (chatId, io) => {
+const markChatAsRead = async (chatId, userId, io) => {
   try {
     const unreadMessages = await Message.findAll({
       where: {
@@ -249,6 +249,9 @@ const markChatAsRead = async (chatId, io) => {
       {
         where: {
           chat_id: chatId,
+          user_id: {
+            [Op.ne]: userId
+          }
         }
       }
     );
@@ -260,6 +263,34 @@ const markChatAsRead = async (chatId, io) => {
           messageId: msg.id,
           readerId: msg.reciever_id,
         });
+      });
+    }
+  } catch (err) {
+    console.error("Error in markUserMessagesAsDelivered:", err);
+  }
+};
+const markMessageAsRead = async (messageId, io) => {
+  try {
+    const message = await Message.findOne({
+      where: {
+        id: messageId
+      }
+    });
+
+    await Message.update(
+      { status: 'read' },
+      {
+        where: {
+          id: messageId,
+        }
+      }
+    );
+    const senderId = message.senderId
+    const senderSocketId = await redis.get(`user:${senderId}`);
+    if (senderSocketId) {
+      io.to(senderSocketId).emit('message_read', {
+        messageId,
+        readerId: message.reciever_id,
       });
     }
   } catch (err) {
@@ -298,4 +329,4 @@ const sentTypingEvent = async (userId, chatId, status, io) => {
 };
 
 
-module.exports = { updateMessageToRead, deleteMessage,editMessage, createMessageReact, sentTypingEvent, saveMessage, markUserMessagesAsDelivered, markChatAsRead, updateUserStatusToOnline, updateUserStatusToOffline };
+module.exports = { markMessageAsRead, updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent, saveMessage, markUserMessagesAsDelivered, markChatAsRead, updateUserStatusToOnline, updateUserStatusToOffline };

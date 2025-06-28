@@ -1,6 +1,6 @@
 const redis = require('../config/redis');
 const { verifyToken } = require('../utils/verifyJWT');
-const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
+const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent,markMessageAsRead, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
 const { publishNotification } = require("../helpers/pushNotification")
 module.exports = (io) => {
   // Middleware to authenticate socket connection
@@ -17,7 +17,7 @@ module.exports = (io) => {
   });
 
   io.on('connection', async (socket) => {
-    const userId = socket.user.id;
+    const userId = socket?.user?.id;
 
     // Notify friends and search for storing it 
     await updateUserStatusToOnline(userId, io)
@@ -69,7 +69,7 @@ module.exports = (io) => {
 
     socket.on('mark_chat_as_read', async ({ chatId }) => {
       try {
-        await markChatAsRead(chatId, io)
+        await markChatAsRead(chatId, userId, io)
         socket.emit("all messages readed successfully", { chatId })
       } catch (err) {
         console.error('send_message error:', err);
@@ -81,15 +81,9 @@ module.exports = (io) => {
     });
 
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
-      try {
-        await updateMessageToRead(messageId, senderId, io);
-      } catch (err) {
-        console.error('message_read error:', err);
-        socket.emit('error_occurred', {
-          type: 'MESSAGE_READ_ERROR',
-          message: 'Failed to mark message as read.',
-        });
-      }
+      // Update the message in DB
+      await markMessageAsRead(messageId)
+      await updateMessageToRead(messageId)
     });
 
     socket.on("typing", async ({ userId, chatId }) => {

@@ -14,7 +14,7 @@ exports.createChat = async (req, res, next) => {
     const userId = req.userId
     const scUserId = req.body.userId
     const type = req.body.type
-    if (userId == scUserId){
+    if (userId == scUserId) {
       return res.status(400).json({ message: "repeated user id" })
     }
     if (type == "chat") {
@@ -115,13 +115,13 @@ exports.getUserChats = async (req, res, next) => {
           chatId: row.chat_id,
           lastMessage: row.content
             ? {
-                content: row.content,
-                status: row.status,
-                createdAt: row.createdAt,
-                type: row.type,
-                senderId: row.sender,
-                isMine: row.sender === userId,
-              }
+              content: row.content,
+              status: row.status,
+              createdAt: row.createdAt,
+              type: row.type,
+              senderId: row.sender,
+              isMine: row.sender === userId,
+            }
             : null,
           unreadCount: row.unread_count,
           isPinned: !!row.is_pinned,
@@ -223,7 +223,7 @@ exports.getChatMessages = async (req, res, next) => {
     const chatId = req.params.chatId;
     const messages = await Message.findAll({
       where: { chat_id: chatId },
-      attributes: ['id', 'content', 'user_id', 'media_url', 'type', 'status', 'createdAt'],
+      attributes: ['id', 'content', 'user_id', 'media_url', 'type', 'status', 'createdAt', 'updatedAt'],
       include: [
         {
           model: User,
@@ -247,12 +247,20 @@ exports.getChatMessages = async (req, res, next) => {
           model: MessageReact,
           as: 'reacts',
           required: false,
-          attributes: ['id']
+          attributes: ['id', 'createdAt'],
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['name', 'id', 'profile_image']
+            }
+          ]
         },
       ]
     })
 
     messages.forEach(m => {
+      m.setDataValue('isUpdated', m.createdAt.toISOString() !== m.updatedAt.toISOString());
       m.setDataValue('isFromMe', m.user?.id === userId);
       const reactCount = m.reacts?.length || 0;
       m.setDataValue('reacts_count', reactCount);
