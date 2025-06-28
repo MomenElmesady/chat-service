@@ -1,6 +1,6 @@
 const redis = require('../config/redis');
 const { verifyToken } = require('../utils/verifyJWT');
-const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
+const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent,markMessageAsRead, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
 const { publishNotification } = require("../helpers/pushNotification")
 module.exports = (io) => {
   // Middleware to authenticate socket connection
@@ -17,7 +17,7 @@ module.exports = (io) => {
   });
 
   io.on('connection', async (socket) => {
-    const userId = socket.user.id;
+    const userId = socket?.user?.id;
 
     // Notify friends and search for storing it 
     await updateUserStatusToOnline(userId, io)
@@ -36,7 +36,7 @@ module.exports = (io) => {
         const messageObj = await saveMessage(userId, receiverId, message, receiverSocketId);
 
         // Notify recipient's device
-        io.to(receiverSocketId).emit('status_update', { messageId: message.id, status: 'sent' });
+        io.to(senderSocketId).emit('status_update', { messageId: message.id, status: 'sent' });
 
         if (receiverSocketId) {
           // send message to the reciver
@@ -66,7 +66,7 @@ module.exports = (io) => {
 
     socket.on('mark_chat_as_read', async ({ chatId }) => {
       try {
-        await markChatAsRead(chatId, io)
+        await markChatAsRead(chatId, userId, io)
         socket.emit("all messages readed successfully", { chatId })
       } catch (err) {
         console.error('send_message error:', err);
@@ -80,6 +80,7 @@ module.exports = (io) => {
     // TODO -> do service, handle sender socketId
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
       // Update the message in DB
+      await markMessageAsRead(messageId)
       await updateMessageToRead(messageId)
     });
 
