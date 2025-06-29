@@ -1,6 +1,6 @@
 const redis = require('../config/redis');
 const { verifyToken } = require('../utils/verifyJWT');
-const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent,markMessageAsRead, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
+const { updateMessageToRead, deleteMessage, editMessage, createMessageReact, sentTypingEvent, markMessageAsRead, saveMessage, markChatAsRead, markUserMessagesAsDelivered, updateUserStatusToOnline, updateUserStatusToOffline } = require('../services/messageService');
 const { publishNotification } = require("../helpers/pushNotification")
 module.exports = (io) => {
   // Middleware to authenticate socket connection
@@ -82,8 +82,8 @@ module.exports = (io) => {
 
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
       // Update the message in DB
-      await markMessageAsRead(messageId)
-      await updateMessageToRead(messageId)
+      await markMessageAsRead(messageId, io)
+      await updateMessageToRead(messageId, senderId, io)
     });
 
     socket.on("typing", async ({ userId, chatId }) => {
