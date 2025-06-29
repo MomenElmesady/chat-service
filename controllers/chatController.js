@@ -33,7 +33,94 @@ exports.createChat = async (req, res, next) => {
         }
       );
       if (chat) {
-        return res.status(400).json({ message: "the chat already found", data: chat })
+        const results = await sequelize.query(
+          `
+          SELECT 
+            c.id AS chat_id,
+            u.id AS user_id,
+            u.name AS user_name,
+            u.profile_image,
+            m.content,
+            m.status,
+            m.createdAt,
+            m.type,
+            m.user_id AS sender,
+            uc.user_id AS current_user_id,
+            uc.is_pinned,
+            uc.is_favorite,
+            uc.pinned_at,
+            (
+              SELECT COUNT(*)
+              FROM messages m2
+              WHERE m2.chat_id = c.id
+                AND m2.status != 'read'
+                AND m2.user_id != :userId
+            ) AS unread_count
+          FROM chats c
+          JOIN user_chats uc ON c.id = uc.chat_id AND uc.user_id = :userId
+          LEFT JOIN user_chats uc2 ON uc2.chat_id = c.id AND uc2.user_id != :userId
+          LEFT JOIN users u ON u.id = uc2.user_id 
+          LEFT JOIN messages m ON m.id = (
+            SELECT id
+            FROM messages
+            WHERE chat_id = c.id
+            ORDER BY createdAt DESC
+            LIMIT 1
+          )
+            where c.id = :chatId
+          ORDER BY m.createdAt DESC;
+          `,
+          {
+            replacements: { userId, chatId: chat.chat_id },
+            type: sequelize.QueryTypes.SELECT,
+          }
+        );
+        results.sort((a, b) => {
+          if (b.is_pinned !== a.is_pinned) {
+            return b.is_pinned - a.is_pinned;
+          }
+          // fallback to message createdAt desc if both have same pinned state
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+
+        // Group chats
+        const chatsMap = {};
+
+        for (const row of results) {
+          const chatId = row.chat_id;
+
+          if (!chatsMap[chatId]) {
+            chatsMap[chatId] = {
+              chatId: row.chat_id,
+              lastMessage: row.content
+                ? {
+                  content: row.content,
+                  status: row.status,
+                  createdAt: row.createdAt,
+                  type: row.type,
+                  senderId: row.sender,
+                  isMine: row.sender === userId,
+                }
+                : null,
+              unreadCount: row.unread_count,
+              isPinned: !!row.is_pinned,
+              isFavorite: !!row.is_favorite,
+              pinnedAt: row.pinned_at,
+              participants: [],
+            };
+          }
+
+          if (row.user_id) {
+            chatsMap[chatId].participants.push({
+              userId: row.user_id,
+              name: row.user_name,
+              profile_image: row.profile_image
+            });
+          }
+        }
+        const chats = Object.values(chatsMap);
+
+        return res.status(200).json({ message: "the chat already found", data: chats[0] });
       }
       chat = await Chat.create({ admin_id: userId })
       await UserChat.create({ chat_id: chat.id, user_id: userId })
