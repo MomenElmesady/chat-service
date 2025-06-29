@@ -82,7 +82,7 @@ module.exports = (io) => {
 
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
       // Update the message in DB
-      await markMessageAsRead(messageId, io)
+      // await markMessageAsRead(messageId, io)
       await updateMessageToRead(messageId, senderId, io)
     });
 
