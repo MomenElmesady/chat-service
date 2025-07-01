@@ -44,6 +44,7 @@ exports.createChat = async (req, res, next) => {
             m.status,
             m.createdAt,
             m.type,
+            m.id AS message_id,
             m.user_id AS sender,
             uc.user_id AS current_user_id,
             uc.is_pinned,
@@ -100,6 +101,7 @@ exports.createChat = async (req, res, next) => {
                   type: row.type,
                   senderId: row.sender,
                   isMine: row.sender === userId,
+                  messageId: row.message_id
                 }
                 : null,
               unreadCount: row.unread_count,
@@ -151,6 +153,7 @@ exports.getUserChats = async (req, res, next) => {
         m.status,
         m.createdAt,
         m.type,
+        m.id ad message_id,
         m.user_id AS sender,
         uc.user_id AS current_user_id,
         uc.is_pinned,
@@ -208,6 +211,7 @@ exports.getUserChats = async (req, res, next) => {
               type: row.type,
               senderId: row.sender,
               isMine: row.sender === userId,
+              messageId: row.message_id
             }
             : null,
           unreadCount: row.unread_count,
