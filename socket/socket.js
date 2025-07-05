@@ -38,14 +38,14 @@ module.exports = (io) => {
         console.log("message id: " + message.id);
         console.log("message obj: " + messageObj['id']);
         // Notify recipient's device
-        io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'sent' });
+        io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'sent', chatId: message.chatId });
 
         console.log("reciever socket : " + receiverSocketId);
         if (receiverSocketId) {
           // send message to the receiver
           io.to(receiverSocketId).emit('receive_message', messageObj);
           // Update sender's status to "Delivered"
-          io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'delivered' });
+          io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'delivered', chatId: message.chatId });
         } else {
           await publishNotification({
             receiverId,
@@ -83,7 +83,7 @@ module.exports = (io) => {
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
       // Update the message in DB
       // await markMessageAsRead(messageId, io)
-      await updateMessageToRead(messageId, senderId, io)
+      await updateMessageToRead(messageId, senderId,chatId, io)
     });
 
     socket.on("typing", async ({ userId, chatId }) => {
