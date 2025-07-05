@@ -188,7 +188,7 @@ const deleteMessage = async (messageId, userId, io) => {
 };
 
 
-const updateMessageToRead = async (messageId, senderId, io) => {
+const updateMessageToRead = async (messageId, senderId, chatId, io) => {
   try {
     await Message.update({ status: 'read' }, { where: { id: messageId } });
     const senderSocketId = await redis.get(`user:${senderId}`);
@@ -196,6 +196,7 @@ const updateMessageToRead = async (messageId, senderId, io) => {
       io.to(senderSocketId).emit('status_update', {
         messageId,
         status: "read",
+        chatId
       });
     }
   } catch (error) {
@@ -240,7 +241,10 @@ const markChatAsRead = async (chatId, userId, io) => {
     const unreadMessages = await Message.findAll({
       where: {
         chat_id: chatId,
-        status: 'deliverd'
+        status: 'deliverd',
+        user_id: {
+            [Op.ne]: userId
+        }
       }
     });
 
