@@ -93,13 +93,26 @@ const createMessageReact = async (messageId, react, userId, io) => {
   try {
     const message = await Message.findOne({ where: { id: messageId } });
     if (!message) return;
-    const receiverId = message.reciever_id
-    const friendSocketId = await redis.get(`user:${receiverId}`);
+    const chatId = message.chat_id;
+    const otherUser = await UserChat.findOne({
+      where: {
+        chat_id: chatId,
+        user_id: {
+          [Op.ne]: userId
+        }
+      },
+      attributes: ['user_id']
+    });
+
+    if (!otherUser) return;
+
+    const otherUserId = otherUser.user_id;
+    const friendSocketId = await redis.get(`user:${otherUserId}`);
+
 
     const existingReact = await MessageReact.findOne({
       where: { message_id: messageId, user_id: userId },
     });
-
     if (existingReact) {
       if (existingReact.react === react) {
         await existingReact.destroy();
@@ -168,7 +181,7 @@ const deleteMessage = async (messageId, userId, io) => {
     if (!message) return;
     const receiverId = message.reciever_id
     const friendSocketId = await redis.get(`user:${receiverId}`);
-    await Message.update({ content: null, isDeleted: true }, {
+    await Message.update({ content: null, media_url: null, isDeleted: true }, {
       where: {
         id: messageId,
         user_id: userId
@@ -243,7 +256,7 @@ const markChatAsRead = async (chatId, userId, io) => {
         chat_id: chatId,
         status: 'deliverd',
         user_id: {
-            [Op.ne]: userId
+          [Op.ne]: userId
         }
       }
     });
@@ -266,6 +279,7 @@ const markChatAsRead = async (chatId, userId, io) => {
         io.to(senderSocketId).emit('message_read', {
           messageId: msg.id,
           readerId: msg.reciever_id,
+          chatId
         });
       });
     }
@@ -321,7 +335,6 @@ const sentTypingEvent = async (userId, chatId, status, io) => {
     const eventName = status === 'typing' ? 'typing' : 'stop_typing';
 
     const senderSocketId = await redis.get(`user:${otherUserId}`);
-
     io.to(senderSocketId).emit(eventName, {
       from: userId,
       chatId
