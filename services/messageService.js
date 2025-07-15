@@ -141,7 +141,7 @@ const editMessage = async (messageId, content, userId, io) => {
     if (!message) return;
     const receiverId = message.reciever_id
     const friendSocketId = await redis.get(`user:${receiverId}`);
-    await Message.update({ content, updatedAt: new Date() }, {
+    await Message.update({ content, updatedAt: new Date(),isUpdated: true }, {
       where: {
         id: messageId,
         user_id: userId

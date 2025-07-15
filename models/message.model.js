@@ -46,6 +46,10 @@ const Message = sequelize.define("message", {
   isDeleted: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  isUpdated: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 
 }, {

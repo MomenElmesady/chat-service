@@ -154,6 +154,7 @@ exports.getUserChats = async (req, res, next) => {
         m.createdAt,
         m.type,
         m.id as message_id,
+        m.isDeleted,
         m.user_id AS sender,
         uc.user_id AS current_user_id,
         uc.is_pinned,
@@ -211,7 +212,8 @@ exports.getUserChats = async (req, res, next) => {
               type: row.type,
               senderId: row.sender,
               isMine: row.sender === userId,
-              messageId: row.message_id
+              messageId: row.message_id,
+              isdeleted: row.isDeleted ? true : false
             }
             : null,
           unreadCount: row.unread_count,
@@ -314,7 +316,7 @@ exports.getChatMessages = async (req, res, next) => {
     const chatId = req.params.chatId;
     const messages = await Message.findAll({
       where: { chat_id: chatId },
-      attributes: ['id', 'content', 'user_id', 'media_url', 'type', 'status', 'createdAt', 'updatedAt'],
+      attributes: ['id', 'content', 'user_id', 'media_url', 'type', 'status', 'createdAt', 'updatedAt','isDeleted','isUpdated'],
       include: [
         {
           model: User,
@@ -331,14 +333,14 @@ exports.getChatMessages = async (req, res, next) => {
           model: Message,
           as: 'parent',
           required: false,
-          attributes: ['id', 'content', 'media_url', 'user_id']
+          attributes: ['id', 'content', 'media_url', 'user_id','isDeleted']
         },
         // this show the react it self and can add include user to show yhe actual react with its user 
         {
           model: MessageReact,
           as: 'reacts',
           required: false,
-          attributes: ['id', 'createdAt'],
+          attributes: ['id', 'createdAt','react'],
           include: [
             {
               model: User,
@@ -351,7 +353,8 @@ exports.getChatMessages = async (req, res, next) => {
     })
 
     messages.forEach(m => {
-      m.setDataValue('isUpdated', m.createdAt.toISOString() !== m.updatedAt.toISOString());
+      console.log(m.createdAt.toISOString() !== m.updatedAt.toISOString())
+      console.log(m)
       m.setDataValue('isFromMe', m.user?.id === userId);
       const reactCount = m.reacts?.length || 0;
       m.setDataValue('reacts_count', reactCount);
