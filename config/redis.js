@@ -5,10 +5,10 @@
 // });
 
 // import { Redis } from '@upstash/redis'
-const {Redis} = require("@upstash/redis")
+const { Redis } = require("@upstash/redis")
 const redis = new Redis({
-  url: 'https://causal-poodle-44170.upstash.io',
-  token: 'AayKAAIjcDEzY2I5MmVjNzZkNjc0MzI5YTc1MTAwNDQxOGM4YTUxNnAxMA',
+  url: 'https://concrete-wasp-46392.upstash.io',
+  token: 'AbU4AAIjcDE2ZDNkMGI1MTI0Yjc0NmNmODIzM2E0YzA2MjllY2JkNHAxMA',
 })
 
-module.exports = redis;
+module.exports = redis;

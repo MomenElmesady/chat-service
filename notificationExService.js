@@ -37,8 +37,8 @@ async function sendPushNotification(token, message) {
 
 // RabbitMQ consumer to listen for new message notifications
 async function listenForNewMessages() {
-  const connection = await amqp.connect('amqp://localhost');
-  const channel = await connection.createChannel();
+const rabbitHost = process.env.RABBITMQ_HOST || 'rabbitmq';
+const connection = await amqp.connect(`amqp://${rabbitHost}:5672`);  const channel = await connection.createChannel();
 
   await channel.assertQueue(queue, { durable: true });
 
