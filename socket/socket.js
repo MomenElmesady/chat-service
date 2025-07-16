@@ -6,9 +6,13 @@ module.exports = (io) => {
   // Middleware to authenticate socket connection
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    // console.log(socket.handshake);
+
     if (!token) return next(new Error("Authentication error"));
     try {
       const decoded = verifyToken(token);
+      console.log(token);
+      console.log(decoded);
       socket.user = decoded;
       return next();
     } catch (err) {
@@ -35,7 +39,6 @@ module.exports = (io) => {
         const senderSocketId = await redis.get(`user:${userId}`);
         const messageObj = await saveMessage(userId, receiverId, message, receiverSocketId);
 
-        console.log("message id: " + message.id);
         console.log("message obj: " + messageObj['id']);
         // Notify recipient's device
         io.to(senderSocketId).emit('status_update', { messageId: messageObj['id'], status: 'sent', chatId: message.chatId });
@@ -83,10 +86,10 @@ module.exports = (io) => {
     socket.on('message_read', async ({ messageId, chatId, senderId }) => {
       // Update the message in DB
       // await markMessageAsRead(messageId, io)
-      await updateMessageToRead(messageId, senderId,chatId, io)
+      await updateMessageToRead(messageId, senderId, chatId, io)
     });
 
-    socket.on("typing", async ({ userId, chatId }) => {
+    socket.on("typing", async ({ chatId }) => {
       if (!userId || !chatId) {
         return socket.emit('error_occurred', {
           type: 'typing Error',
@@ -104,7 +107,8 @@ module.exports = (io) => {
         });
       }
     });
-    socket.on("stop_typing", async ({ userId, chatId }) => {
+    socket.on("stop_typing", async ({ chatId }) => {
+      console.log('stop_typing');
       if (!userId || !chatId) {
         return socket.emit('error_occurred', {
           type: 'typing Error',
@@ -123,28 +127,28 @@ module.exports = (io) => {
       }
     });
 
-    socket.on("editMessage", async ({ messageId }) => {
+    socket.on("editMessage", async ({ messageId, content }) => {
       try {
-        await editMessage(messageId, userId, io)
+        await editMessage(messageId, content, userId, io)
         socket.emit("message_edited_successfully", { messageId })
       } catch (error) {
-        console.error('message_react event error:', error);
+        console.error('editMessage event error:', error);
         socket.emit('error_occurred', {
           type: 'typing Error',
-          message: 'Failed to send message_react. Please try again.',
+          message: 'Failed to send editMessage. Please try again.',
         });
       }
     })
 
-    socket.on("deleteMessage", async ({ messageId, content }) => {
+    socket.on("deleteMessage", async ({ messageId }) => {
       try {
-        await deleteMessage(messageId, content, userId, io)
-        socket.emit("message_edited_successfully", { messageId })
+        await deleteMessage(messageId, userId, io)
+        socket.emit("message_deleted_successfully", { messageId })
       } catch (error) {
-        console.error('message_react event error:', error);
+        console.error('deleteMessage event error:', error);
         socket.emit('error_occurred', {
           type: 'typing Error',
-          message: 'Failed to send message_react. Please try again.',
+          message: 'Failed to send deleteMessage. Please try again.',
         });
       }
     })
@@ -153,7 +157,7 @@ module.exports = (io) => {
     socket.on("message_react", async ({ messageId, react }) => {
       try {
         await createMessageReact(messageId, react, userId, io)
-        socket.emit("message_deleted_successfully", { messageId })
+        socket.emit("message_reacted_successfully", { messageId })
       } catch (error) {
         console.error('message_react event error:', error);
         socket.emit('error_occurred', {
